@@ -36,7 +36,6 @@ def read_uploaded(file_obj):
     data = file_obj.getvalue()
     name = file_obj.name.lower()
     if name.endswith(".csv"):
-        # Detect common CSV delimiters so files open correctly across locales.
         return pd.read_csv(io.BytesIO(data), sep=None, engine="python")
     if name.endswith(".xlsx"):
         return pd.read_excel(io.BytesIO(data))
@@ -115,11 +114,17 @@ def clean_dataframe(df):
     duplicate = duplicate_key.duplicated(keep="first")
 
     # Build a business-facing cleaned output.
-    cleaned = df.loc[~duplicate].copy()
+    keep_mask = ~duplicate
+
+    # Reset indexes before assigning derived columns.
+    # This avoids pandas alignment errors when an input file contains
+    # duplicate row labels or duplicate records.
+    cleaned = df.loc[keep_mask].copy().reset_index(drop=True)
+
     if website_col:
-        cleaned[website_col] = norm_url.loc[cleaned.index]
+        cleaned[website_col] = norm_url.loc[keep_mask].reset_index(drop=True).to_numpy()
     if email_col:
-        cleaned[email_col] = norm_email.loc[cleaned.index]
+        cleaned[email_col] = norm_email.loc[keep_mask].reset_index(drop=True).to_numpy()
 
     # QA summary only — no internal helper columns exposed to the client.
     qa = {
