@@ -11,10 +11,17 @@ st.set_page_config(page_title="Lead List Cleaner", page_icon="🧹", layout="wid
 st.markdown("""
 <style>
 .block-container {max-width: 1200px; padding-top: 2rem; padding-bottom: 3rem;}
-.hero {padding: 1.4rem 1.6rem; border-radius: 18px; background: linear-gradient(135deg,#17365D 0%,#2F75B5 100%); color:#fff; margin-bottom:1.2rem;}
+.hero {
+    padding: 1.4rem 1.6rem;
+    border-radius: 18px;
+    background: linear-gradient(135deg,#17365D 0%,#2F75B5 100%);
+    color:#fff;
+    margin-bottom:1.3rem;
+}
 .hero h1 {margin:0 0 .35rem 0; font-size:2.3rem;}
 .hero p {margin:0; opacity:.92; font-size:1rem;}
 .small-note {color:#667085; font-size:.86rem;}
+.stButton>button, .stDownloadButton>button {border-radius:10px;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,6 +73,7 @@ def find_col(df, candidates):
 def clean_dataframe(df):
     df = df.copy()
     df.columns = [normalize_text(c) for c in df.columns]
+
     for col in df.columns:
         df[col] = df[col].map(normalize_text)
 
@@ -73,37 +81,81 @@ def clean_dataframe(df):
     website_col = find_col(df, ["website", "website url", "url", "domain"])
     email_col = find_col(df, ["email", "email address", "e-mail"])
 
-    if website_col:
-        df["Website (normalized)"] = df[website_col].map(normalize_url)
-    if email_col:
-        df["Email (normalized)"] = df[email_col].str.lower().str.strip()
-    if company_col:
-        df["Company (normalized)"] = df[company_col].str.lower().str.replace(r"[^a-z0-9]+", "", regex=True)
+    # Keep the raw input presentation clean: preserve only original columns.
+    raw_display = df.copy()
 
-    df["Missing Website"] = df["Website (normalized)"].eq("") if website_col else True
-    df["Missing Email"] = df["Email (normalized)"].eq("") if email_col else True
+    if website_col:
+        norm_url = df[website_col].map(normalize_url)
+    else:
+        norm_url = pd.Series([""] * len(df), index=df.index)
+
+    if email_col:
+        norm_email = df[email_col].str.lower().str.strip()
+    else:
+        norm_email = pd.Series([""] * len(df), index=df.index)
+
+    if company_col:
+        norm_company = df[company_col].str.lower().str.replace(r"[^a-z0-9]+", "", regex=True)
+    else:
+        norm_company = pd.Series(range(len(df)), index=df.index).astype(str)
+
+    missing_website = norm_url.eq("")
+    missing_email = norm_email.eq("") if email_col else pd.Series([False] * len(df), index=df.index)
 
     if company_col and website_col:
-        duplicate_key = df["Company (normalized)"] + "|" + df["Website (normalized)"]
+        duplicate_key = norm_company + "|" + norm_url
     elif website_col:
-        duplicate_key = df["Website (normalized)"]
+        duplicate_key = norm_url
     elif company_col:
-        duplicate_key = df["Company (normalized)"]
+        duplicate_key = norm_company
     else:
         duplicate_key = pd.Series(range(len(df)), index=df.index).astype(str)
 
-    df["Duplicate"] = duplicate_key.duplicated(keep="first")
-    cleaned = df.loc[~df["Duplicate"]].copy()
-    cleaned = cleaned.drop(columns=["Company (normalized)", "Email (normalized)", "Website (normalized)"], errors="ignore")
-    return df, cleaned
+    duplicate = duplicate_key.duplicated(keep="first")
+
+    # Build a business-facing cleaned output.
+    cleaned = df.loc[~duplicate].copy()
+    if website_col:
+        cleaned[website_col] = norm_url.loc[cleaned.index]
+    if email_col:
+        cleaned[email_col] = norm_email.loc[cleaned.index]
+
+    # QA summary only — no internal helper columns exposed to the client.
+    qa = {
+        "total": len(df),
+        "duplicates": int(duplicate.sum()),
+        "missing_website": int(missing_website.sum()),
+        "missing_email": int(missing_email.sum()),
+        "final_records": len(cleaned),
+        "has_email_column": email_col is not None,
+    }
+
+    review_mask = duplicate | missing_website
+    if email_col is not None:
+        review_mask = review_mask | missing_email
+    raw_display["QA Status"] = "OK"
+    raw_display.loc[review_mask & ~duplicate, "QA Status"] = "Review"
+    raw_display.loc[duplicate, "QA Status"] = "Duplicate"
+
+    return raw_display, cleaned, qa
 
 def export_xlsx(cleaned, qa):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         cleaned.to_excel(writer, sheet_name="Cleaned Leads", index=False)
-        qa.to_excel(writer, sheet_name="Quality Checks", index=False)
+        pd.DataFrame({
+            "Check": ["Raw records", "Duplicates flagged", "Records with missing website",
+                      "Records with missing email" if qa["has_email_column"] else "Email check",
+                      "Final cleaned records"],
+            "Result": [qa["total"], qa["duplicates"], qa["missing_website"],
+                       qa["missing_email"] if qa["has_email_column"] else "Not provided",
+                       qa["final_records"]],
+            "Status": ["PASS", "PASS", "REVIEW" if qa["missing_website"] else "PASS",
+                       "REVIEW" if qa["has_email_column"] and qa["missing_email"] else "PASS",
+                       "PASS"],
+        }).to_excel(writer, sheet_name="Quality Checks", index=False)
     output.seek(0)
-    return output
+    return output.getvalue()
 
 sample_path = Path(__file__).with_name("demo_leads.csv")
 
@@ -113,6 +165,10 @@ with left:
     uploaded = st.file_uploader("CSV or XLSX", type=["csv", "xlsx"], label_visibility="collapsed")
 with right:
     st.subheader("Quick demo")
+    st.markdown(
+        '<div class="small-note">A demo dataset is loaded automatically so visitors can see the complete workflow immediately.</div>',
+        unsafe_allow_html=True,
+    )
     if sample_path.exists():
         st.download_button(
             "Download sample input",
@@ -121,10 +177,6 @@ with right:
             mime="text/csv",
             use_container_width=True,
         )
-    st.markdown(
-        '<div class="small-note">A demo dataset is loaded automatically, so visitors can see the workflow immediately.</div>',
-        unsafe_allow_html=True,
-    )
 
 if uploaded is not None:
     source_name = uploaded.name
@@ -133,39 +185,46 @@ if uploaded is not None:
     except Exception as exc:
         st.error(f"Could not read the file: {exc}")
         st.stop()
-elif sample_path.exists():
-    source_name = "Demo dataset"
-    input_df = pd.read_csv(sample_path)
 else:
-    st.info("Upload a CSV or XLSX file to start.")
-    st.stop()
+    source_name = "Demo dataset"
+    if sample_path.exists():
+        input_df = pd.read_csv(sample_path)
+    else:
+        st.info("Upload a CSV or XLSX file to start.")
+        st.stop()
 
-raw, cleaned = clean_dataframe(input_df)
-total = len(raw)
-duplicates = int(raw["Duplicate"].sum())
-missing_web = int(raw["Missing Website"].sum())
-missing_email = int(raw["Missing Email"].sum())
+raw, cleaned, qa = clean_dataframe(input_df)
 
 st.caption(f"Showing: {source_name}")
 
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Raw records", total)
-c2.metric("Duplicates flagged", duplicates)
-c3.metric("Missing websites", missing_web)
-c4.metric("Final records", len(cleaned))
+c1.metric("Raw records", qa["total"])
+c2.metric("Duplicates flagged", qa["duplicates"])
+c3.metric("Needs review", qa["missing_website"] + (qa["missing_email"] if qa["has_email_column"] else 0))
+c4.metric("Final records", qa["final_records"])
+
+st.divider()
 
 tab1, tab2, tab3 = st.tabs(["Quality check", "Cleaned output", "How it works"])
 
-qa = pd.DataFrame({
-    "Check": ["Raw records", "Duplicates flagged", "Records with missing website", "Records with missing email", "Final cleaned records"],
-    "Result": [total, duplicates, missing_web, missing_email, len(cleaned)],
-    "Status": ["PASS", "PASS", "REVIEW" if missing_web else "PASS", "REVIEW" if missing_email else "PASS", "PASS"],
-})
-
 with tab1:
     st.subheader("Quality check")
-    st.dataframe(qa, use_container_width=True, hide_index=True)
+    checks = [
+        ("Raw records", qa["total"], "PASS"),
+        ("Duplicates flagged", qa["duplicates"], "PASS"),
+        ("Records with missing website", qa["missing_website"], "REVIEW" if qa["missing_website"] else "PASS"),
+    ]
+    if qa["has_email_column"]:
+        checks.append(("Records with missing email", qa["missing_email"], "REVIEW" if qa["missing_email"] else "PASS"))
+    else:
+        checks.append(("Email field", "Not provided", "PASS"))
+    checks.append(("Final cleaned records", qa["final_records"], "PASS"))
+
+    qa_table = pd.DataFrame(checks, columns=["Check", "Result", "Status"])
+    st.dataframe(qa_table, use_container_width=True, hide_index=True)
+
     st.subheader("Raw input")
+    st.caption("QA status is added for clarity; internal normalization fields are hidden.")
     st.dataframe(raw, use_container_width=True, hide_index=True)
 
 with tab2:
@@ -174,7 +233,7 @@ with tab2:
     export = export_xlsx(cleaned, qa)
     st.download_button(
         "Download cleaned XLSX",
-        export.getvalue(),
+        export,
         file_name="cleaned_leads.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         type="primary",
