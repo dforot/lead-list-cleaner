@@ -171,7 +171,7 @@ with right:
     )
     if sample_path.exists():
         st.download_button(
-            "Download sample input",
+            "Download sample CSV",
             sample_path.read_bytes(),
             file_name="demo_leads.csv",
             mime="text/csv",
