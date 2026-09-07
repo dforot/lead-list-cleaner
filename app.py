@@ -36,7 +36,8 @@ def read_uploaded(file_obj):
     data = file_obj.getvalue()
     name = file_obj.name.lower()
     if name.endswith(".csv"):
-        return pd.read_csv(io.BytesIO(data))
+        # Detect common CSV delimiters so files open correctly across locales.
+        return pd.read_csv(io.BytesIO(data), sep=None, engine="python")
     if name.endswith(".xlsx"):
         return pd.read_excel(io.BytesIO(data))
     raise ValueError("Please upload a CSV or XLSX file.")

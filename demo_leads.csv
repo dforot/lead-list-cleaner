@@ -1,33 +1,33 @@
-Company,Website,Industry,Location
-HubSpot,https://www.hubspot.com/,Marketing software,Cambridge MA
-Shopify,shopify.com,E-commerce platform,Ottawa Canada
-Atlassian,https://www.atlassian.com/,Collaboration software,Sydney Australia
-Canva,https://www.canva.com/,Design software,Sydney Australia
-Notion,https://www.notion.com/,Productivity software,San Francisco CA
-Zapier,zapier.com,Automation software,San Francisco CA
-Asana,https://asana.com/,Work management software,San Francisco CA
-Monday.com,https://monday.com/,Work management software,Tel Aviv Israel
-Webflow,https://webflow.com/,Web development platform,San Francisco CA
-Intercom,https://www.intercom.com/,Customer support software,San Francisco CA
-Zendesk,https://www.zendesk.com/,Customer service software,San Francisco CA
-Freshworks,https://www.freshworks.com/,Business software,San Mateo CA
-Mailchimp,https://mailchimp.com/,Marketing platform,Atlanta GA
-Calendly,https://calendly.com/,Scheduling software,Atlanta GA
-Typeform,https://www.typeform.com/,Online forms,Barcelona Spain
-Airtable,https://www.airtable.com/,Database platform,San Francisco CA
-Dropbox,https://www.dropbox.com/,Cloud storage,San Francisco CA
-Slack,https://slack.com/,Business communication,San Francisco CA
-Zoom,https://zoom.us/,Video conferencing,San Jose CA
-DocuSign,https://www.docusign.com/,Electronic signature,San Francisco CA
-Twilio,https://www.twilio.com/,Communications platform,San Francisco CA
-Miro,https://miro.com/,Visual collaboration,Amsterdam Netherlands
-Loom,https://www.loom.com/,Screen recording,San Francisco CA
-Linear,https://linear.app/,Project management,San Francisco CA
-Figma,https://www.figma.com/,Design collaboration,San Francisco CA
-GitLab,https://about.gitlab.com/,DevOps platform,Remote
-ClickUp,https://clickup.com/,Productivity software,San Diego CA
-Brex,,Fintech,San Francisco CA
-Ramp,,Fintech,New York NY
-HubSpot,https://www.hubspot.com/,Marketing software,Cambridge MA
-Canva,https://www.canva.com/,Design software,Sydney Australia
-Zapier,zapier.com,Automation software,San Francisco CA
+﻿Company;Website;Industry;Location
+HubSpot;https://www.hubspot.com/;Marketing software;Cambridge, MA
+Shopify;https://www.shopify.com/;E-commerce platform;Ottawa, Canada
+Atlassian;https://www.atlassian.com/;Collaboration software;Sydney, Australia
+Canva;https://www.canva.com/;Design software;Sydney, Australia
+Notion;https://www.notion.com/;Productivity software;San Francisco, CA
+Zapier;https://zapier.com/;Automation software;San Francisco, CA
+Asana;https://asana.com/;Work management software;San Francisco, CA
+Monday.com;https://monday.com/;Work management software;Tel Aviv, Israel
+Webflow;https://webflow.com/;Web development platform;San Francisco, CA
+Intercom;https://www.intercom.com/;Customer support software;San Francisco, CA
+Zendesk;https://www.zendesk.com/;Customer service software;San Francisco, CA
+Freshworks;https://www.freshworks.com/;Business software;San Mateo, CA
+Mailchimp;https://mailchimp.com/;Marketing platform;Atlanta, GA
+Calendly;https://calendly.com/;Scheduling software;Atlanta, GA
+Typeform;https://www.typeform.com/;Online forms;Barcelona, Spain
+Airtable;https://www.airtable.com/;Database platform;San Francisco, CA
+Dropbox;https://www.dropbox.com/;Cloud storage;San Francisco, CA
+Slack;https://slack.com/;Business communication;San Francisco, CA
+Zoom;https://zoom.us/;Video conferencing;San Jose, CA
+DocuSign;https://www.docusign.com/;Electronic signature;San Francisco, CA
+Twilio;https://www.twilio.com/;Communications platform;San Francisco, CA
+Miro;https://miro.com/;Visual collaboration;Amsterdam, Netherlands
+Loom;https://www.loom.com/;Screen recording;San Francisco, CA
+Linear;https://linear.app/;Project management;San Francisco, CA
+Figma;https://www.figma.com/;Design collaboration;San Francisco, CA
+GitLab;https://about.gitlab.com/;DevOps platform;Remote
+ClickUp;https://clickup.com/;Productivity software;San Diego, CA
+Brex;;Fintech;San Francisco, CA
+Ramp;;Fintech;New York, NY
+HubSpot;https://www.hubspot.com/;Marketing software;Cambridge, MA
+Canva;https://www.canva.com/;Design software;Sydney, Australia
+Zapier;zapier.com;Automation software;San Francisco, CA
