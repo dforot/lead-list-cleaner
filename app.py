@@ -1,22 +1,33 @@
 import io
 import re
+from pathlib import Path
 from urllib.parse import urlparse
 
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(
-    page_title="Lead List Cleaner",
-    page_icon="🧹",
-    layout="wide",
-)
+st.set_page_config(page_title="Lead List Cleaner", page_icon="🧹", layout="wide")
 
-st.title("Lead List Cleaner")
-st.caption("A lightweight business tool for cleaning, standardizing, and quality-checking lead spreadsheets.")
+st.markdown("""
+<style>
+.block-container {max-width: 1200px; padding-top: 2rem; padding-bottom: 3rem;}
+.hero {padding: 1.4rem 1.6rem; border-radius: 18px; background: linear-gradient(135deg,#17365D 0%,#2F75B5 100%); color:#fff; margin-bottom:1.2rem;}
+.hero h1 {margin:0 0 .35rem 0; font-size:2.3rem;}
+.hero p {margin:0; opacity:.92; font-size:1rem;}
+.small-note {color:#667085; font-size:.86rem;}
+</style>
+""", unsafe_allow_html=True)
 
-def read_file(uploaded):
-    name = uploaded.name.lower()
-    data = uploaded.getvalue()
+st.markdown("""
+<div class="hero">
+<h1>Lead List Cleaner</h1>
+<p>Clean, validate and standardize lead spreadsheets — then export a ready-to-use XLSX file.</p>
+</div>
+""", unsafe_allow_html=True)
+
+def read_uploaded(file_obj):
+    data = file_obj.getvalue()
+    name = file_obj.name.lower()
     if name.endswith(".csv"):
         return pd.read_csv(io.BytesIO(data))
     if name.endswith(".xlsx"):
@@ -55,7 +66,6 @@ def find_col(df, candidates):
 def clean_dataframe(df):
     df = df.copy()
     df.columns = [normalize_text(c) for c in df.columns]
-
     for col in df.columns:
         df[col] = df[col].map(normalize_text)
 
@@ -65,50 +75,27 @@ def clean_dataframe(df):
 
     if website_col:
         df["Website (normalized)"] = df[website_col].map(normalize_url)
-
     if email_col:
         df["Email (normalized)"] = df[email_col].str.lower().str.strip()
-
     if company_col:
         df["Company (normalized)"] = df[company_col].str.lower().str.replace(r"[^a-z0-9]+", "", regex=True)
 
-    # QA flags before deduplication
-    if website_col:
-        df["Missing Website"] = df["Website (normalized)"].eq("")
-    else:
-        df["Missing Website"] = True
+    df["Missing Website"] = df["Website (normalized)"].eq("") if website_col else True
+    df["Missing Email"] = df["Email (normalized)"].eq("") if email_col else True
 
-    if email_col:
-        df["Missing Email"] = df["Email (normalized)"].eq("")
-    else:
-        df["Missing Email"] = True
-
-    duplicate_key = None
     if company_col and website_col:
         duplicate_key = df["Company (normalized)"] + "|" + df["Website (normalized)"]
     elif website_col:
         duplicate_key = df["Website (normalized)"]
     elif company_col:
         duplicate_key = df["Company (normalized)"]
-
-    if duplicate_key is not None:
-        df["Duplicate"] = duplicate_key.duplicated(keep="first")
     else:
-        df["Duplicate"] = False
+        duplicate_key = pd.Series(range(len(df)), index=df.index).astype(str)
 
+    df["Duplicate"] = duplicate_key.duplicated(keep="first")
     cleaned = df.loc[~df["Duplicate"]].copy()
-
-    # Remove helper columns from the deliverable while keeping QA flags.
-    helper = [c for c in ["Company (normalized)", "Email (normalized)", "Website (normalized)"] if c in cleaned.columns]
-    if website_col and website_col not in cleaned.columns:
-        cleaned[website_col] = cleaned["Website (normalized)"]
-    cleaned = cleaned.drop(columns=helper, errors="ignore")
-
-    return df, cleaned, {
-        "company_col": company_col,
-        "website_col": website_col,
-        "email_col": email_col,
-    }
+    cleaned = cleaned.drop(columns=["Company (normalized)", "Email (normalized)", "Website (normalized)"], errors="ignore")
+    return df, cleaned
 
 def export_xlsx(cleaned, qa):
     output = io.BytesIO()
@@ -118,58 +105,91 @@ def export_xlsx(cleaned, qa):
     output.seek(0)
     return output
 
-uploaded = st.file_uploader("Upload a lead list", type=["csv", "xlsx"])
+sample_path = Path(__file__).with_name("demo_leads.csv")
 
-if uploaded is None:
-    st.info("Upload a CSV or XLSX file to start.")
-    st.markdown("### What this demo does")
-    st.write("• Standardizes text and URLs  • Flags missing fields  • Detects duplicates  • Produces a cleaned XLSX deliverable")
-else:
-    try:
-        raw = read_file(uploaded)
-        raw, cleaned, mapping = clean_dataframe(raw)
-
-        total = len(raw)
-        duplicates = int(raw["Duplicate"].sum())
-        missing_web = int(raw["Missing Website"].sum())
-        missing_email = int(raw["Missing Email"].sum())
-
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Raw records", total)
-        c2.metric("Duplicates flagged", duplicates)
-        c3.metric("Missing websites", missing_web)
-        c4.metric("Final records", len(cleaned))
-
-        st.markdown("### Data quality")
-        qa = pd.DataFrame({
-            "Check": [
-                "Raw records",
-                "Duplicates flagged",
-                "Records with missing website",
-                "Records with missing email",
-                "Final cleaned records",
-            ],
-            "Result": [total, duplicates, missing_web, missing_email, len(cleaned)],
-        })
-        st.dataframe(qa, use_container_width=True, hide_index=True)
-
-        st.markdown("### Cleaned output")
-        st.dataframe(cleaned, use_container_width=True, hide_index=True)
-
-        export = export_xlsx(cleaned, qa)
+left, right = st.columns([2, 1])
+with left:
+    st.subheader("Upload your lead list")
+    uploaded = st.file_uploader("CSV or XLSX", type=["csv", "xlsx"], label_visibility="collapsed")
+with right:
+    st.subheader("Quick demo")
+    if sample_path.exists():
         st.download_button(
-            "Download cleaned XLSX",
-            data=export,
-            file_name="cleaned_leads.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            type="primary",
+            "Download sample input",
+            sample_path.read_bytes(),
+            file_name="demo_leads.csv",
+            mime="text/csv",
+            use_container_width=True,
         )
+    st.markdown(
+        '<div class="small-note">A demo dataset is loaded automatically, so visitors can see the workflow immediately.</div>',
+        unsafe_allow_html=True,
+    )
 
-        st.caption(
-            f"Detected columns — Company: {mapping['company_col'] or 'not found'} | "
-            f"Website: {mapping['website_col'] or 'not found'} | "
-            f"Email: {mapping['email_col'] or 'not found'}"
-        )
-
+if uploaded is not None:
+    source_name = uploaded.name
+    try:
+        input_df = read_uploaded(uploaded)
     except Exception as exc:
-        st.error(f"Could not process the file: {exc}")
+        st.error(f"Could not read the file: {exc}")
+        st.stop()
+elif sample_path.exists():
+    source_name = "Demo dataset"
+    input_df = pd.read_csv(sample_path)
+else:
+    st.info("Upload a CSV or XLSX file to start.")
+    st.stop()
+
+raw, cleaned = clean_dataframe(input_df)
+total = len(raw)
+duplicates = int(raw["Duplicate"].sum())
+missing_web = int(raw["Missing Website"].sum())
+missing_email = int(raw["Missing Email"].sum())
+
+st.caption(f"Showing: {source_name}")
+
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Raw records", total)
+c2.metric("Duplicates flagged", duplicates)
+c3.metric("Missing websites", missing_web)
+c4.metric("Final records", len(cleaned))
+
+tab1, tab2, tab3 = st.tabs(["Quality check", "Cleaned output", "How it works"])
+
+qa = pd.DataFrame({
+    "Check": ["Raw records", "Duplicates flagged", "Records with missing website", "Records with missing email", "Final cleaned records"],
+    "Result": [total, duplicates, missing_web, missing_email, len(cleaned)],
+    "Status": ["PASS", "PASS", "REVIEW" if missing_web else "PASS", "REVIEW" if missing_email else "PASS", "PASS"],
+})
+
+with tab1:
+    st.subheader("Quality check")
+    st.dataframe(qa, use_container_width=True, hide_index=True)
+    st.subheader("Raw input")
+    st.dataframe(raw, use_container_width=True, hide_index=True)
+
+with tab2:
+    st.subheader("Cleaned output")
+    st.dataframe(cleaned, use_container_width=True, hide_index=True)
+    export = export_xlsx(cleaned, qa)
+    st.download_button(
+        "Download cleaned XLSX",
+        export.getvalue(),
+        file_name="cleaned_leads.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        type="primary",
+    )
+
+with tab3:
+    st.subheader("Workflow")
+    st.markdown(
+        "**1. Collect** — Start with a CSV/XLSX lead list.\n\n"
+        "**2. Standardize** — Normalize text and website URLs.\n\n"
+        "**3. Validate** — Flag missing fields and potential duplicates.\n\n"
+        "**4. Clean** — Remove duplicate records and prepare the final dataset.\n\n"
+        "**5. Export** — Download a business-ready XLSX deliverable."
+    )
+    st.caption("Portfolio demo: self-created sample using public company information. No client relationship is claimed.")
+
+st.divider()
+st.caption("Python • Streamlit • Excel/XLSX • Data Cleaning • Quality Checks")
